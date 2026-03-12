@@ -189,5 +189,8 @@
     "@code-vibe/persistence": "workspace:*",
     "@code-vibe/retrieval": "workspace:*",
     "@code-vibe/shared": "workspace:*"
+  },
+  "scripts": {
+    "watch": "node ../../scripts/build-extension.mjs --watch"
   }
 }
