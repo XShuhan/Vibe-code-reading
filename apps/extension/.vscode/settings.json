@@ -1,0 +1,8 @@
+{
+  "vibe.model.provider": "openai-compatible",
+  "vibe.model.baseUrl": "https://api.kimi.com/coding",
+  "vibe.model.apiKey": "sk-kimi-dxqOi4PySYov7NWNzIacNHS2FHdjLOyBmFxsCUZ7YKNPIIN8qc0xPwJUtcJoNcra",
+  "vibe.model.model": "kimi-for-coding",
+  "vibe.model.temperature": 0.1,
+  "vibe.model.maxTokens": 2000
+}

@@ -7,7 +7,7 @@ export default defineConfig({
   test: {
     environment: "node",
     include: ["**/*.test.ts"],
-    exclude: ["**/node_modules/**", "**/fixtures/**"],
+    exclude: ["**/node_modules/**", "**/fixtures/**", "**/code-vibe-testing/**"],
     coverage: {
       reporter: ["text", "html"]
     }
