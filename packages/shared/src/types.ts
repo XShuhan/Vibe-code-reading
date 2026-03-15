@@ -17,6 +17,19 @@ export type CodeEdgeType =
   | "references";
 
 export type ThreadRole = "user" | "assistant" | "system_internal";
+export type ThreadQuestionType =
+  | "explain_code"
+  | "call_flow"
+  | "principle"
+  | "risk_review"
+  | "module_summary";
+
+export type ThreadSkillId =
+  | "ExplainSkill"
+  | "CallFlowSkill"
+  | "PrincipleSkill"
+  | "RiskReviewSkill"
+  | "ModuleSummarySkill";
 
 export type CardType =
   | "SymbolCard"
@@ -96,12 +109,28 @@ export interface ThreadMessage {
   content: string;
   citations: Citation[];
   createdAt: string;
+  structuredAnswer?: StructuredThreadAnswer;
+}
+
+export interface StructuredThreadAnswer {
+  questionType: ThreadQuestionType;
+  skillId: ThreadSkillId;
+  questionRestatement: string;
+  conclusion: string;
+  codeBehavior: string;
+  principle: string;
+  callFlow: string;
+  risks: string;
+  uncertainty: string;
+  sourceReferences: string[];
 }
 
 export interface Thread {
   id: string;
   workspaceId: string;
   title: string;
+  questionType?: ThreadQuestionType;
+  skillId?: ThreadSkillId;
   createdAt: string;
   updatedAt: string;
   contextRefs: string[];
@@ -169,6 +198,7 @@ export interface QuestionContext {
 
 export interface GroundedAnswer {
   answerMarkdown: string;
+  structuredAnswer?: StructuredThreadAnswer;
   citations: Citation[];
   suggestedCards: Array<Pick<Card, "title" | "type" | "summary">>;
   uncertaintyFlags: string[];

@@ -6,7 +6,8 @@ import type {
   ModelInfo,
   ModelRequest,
   ModelResponse,
-  QuestionContext
+  QuestionContext,
+  StructuredThreadAnswer
 } from "@code-vibe/shared";
 
 import { groundedExplainPrompt } from "./prompt/groundedExplainPrompt";
@@ -35,10 +36,17 @@ export function createModelAdapter(config: ModelConfig): ModelAdapter {
 export async function answerGroundedQuestion(
   config: ModelConfig,
   ctx: QuestionContext,
-  evidence: EvidenceSpan[]
+  evidence: EvidenceSpan[],
+  options?: {
+    systemInstruction?: string;
+    promptInstruction?: string;
+    questionType?: StructuredThreadAnswer["questionType"];
+    skillId?: StructuredThreadAnswer["skillId"];
+    structuredOutput?: boolean;
+  }
 ): Promise<GroundedAnswer> {
   const adapter = createModelAdapter(config);
-  const prompt = groundedExplainPrompt(ctx, evidence);
+  const prompt = groundedExplainPrompt(ctx, evidence, options?.promptInstruction);
 
   const response = await adapter.completeChat({
     model: config.model || "mock-grounded",
@@ -48,6 +56,7 @@ export async function answerGroundedQuestion(
       {
         role: "system",
         content:
+          options?.systemInstruction ??
           "Explain code using only the supplied evidence. Distinguish facts, inferences, and uncertainty."
       },
       {
@@ -74,15 +83,23 @@ export async function answerGroundedQuestion(
     summary: item.reason
   }));
 
-  const answerMarkdown = [
-    response.content,
-    "",
-    "Source references",
-    ...citations.map((citation, index) => `${index + 1}. ${citation.label}`)
-  ].join("\n");
+  const structuredAnswer =
+    options?.structuredOutput
+      ? parseStructuredAnswer(response.content, options?.questionType, options?.skillId, citations)
+      : undefined;
+
+  const answerMarkdown = structuredAnswer
+    ? formatStructuredAnswerMarkdown(structuredAnswer)
+    : [
+        response.content,
+        "",
+        "Source references",
+        ...citations.map((citation, index) => `${index + 1}. ${citation.label}`)
+      ].join("\n");
 
   return {
     answerMarkdown,
+    structuredAnswer,
     citations,
     suggestedCards,
     uncertaintyFlags
@@ -121,4 +138,86 @@ export async function testModelConnection(
 function inferCardTitle(filePath: string): string {
   const lastSegment = filePath.split("/").at(-1) ?? filePath;
   return lastSegment.replace(/\.[^.]+$/, "");
+}
+
+function parseStructuredAnswer(
+  content: string,
+  questionType: StructuredThreadAnswer["questionType"] | undefined,
+  skillId: StructuredThreadAnswer["skillId"] | undefined,
+  citations: GroundedAnswer["citations"]
+): StructuredThreadAnswer | undefined {
+  const parsed = safeParseJsonObject(content);
+  if (!parsed) {
+    return undefined;
+  }
+
+  return {
+    questionType: questionType ?? "explain_code",
+    skillId: skillId ?? "ExplainSkill",
+    questionRestatement: readString(parsed.questionRestatement),
+    conclusion: readString(parsed.conclusion),
+    codeBehavior: readString(parsed.codeBehavior),
+    principle: readString(parsed.principle),
+    callFlow: readString(parsed.callFlow),
+    risks: readString(parsed.risks),
+    uncertainty: readString(parsed.uncertainty),
+    sourceReferences: citations.map((citation) => citation.label)
+  };
+}
+
+function safeParseJsonObject(content: string): Record<string, unknown> | null {
+  const trimmed = content.trim();
+  const direct = parseJsonCandidate(trimmed);
+  if (direct) {
+    return direct;
+  }
+
+  const blockMatch = trimmed.match(/```(?:json)?\s*([\s\S]*?)\s*```/i);
+  if (!blockMatch) {
+    return null;
+  }
+
+  return parseJsonCandidate(blockMatch[1]);
+}
+
+function parseJsonCandidate(input: string): Record<string, unknown> | null {
+  try {
+    const value = JSON.parse(input);
+    return isRecord(value) ? value : null;
+  } catch {
+    return null;
+  }
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+function readString(value: unknown): string {
+  return typeof value === "string" && value.trim() ? value.trim() : "Not enough grounded evidence.";
+}
+
+function formatStructuredAnswerMarkdown(answer: StructuredThreadAnswer): string {
+  return [
+    "Question restatement",
+    answer.questionRestatement,
+    "",
+    "Conclusion first",
+    answer.conclusion,
+    "",
+    "What the code is doing",
+    answer.codeBehavior,
+    "",
+    "Why / principle",
+    answer.principle,
+    "",
+    "Call flow / upstream-downstream",
+    answer.callFlow,
+    "",
+    "Risks / uncertainties",
+    [answer.risks, answer.uncertainty].filter(Boolean).join("\n"),
+    "",
+    "Source references",
+    ...answer.sourceReferences.map((reference, index) => `${index + 1}. ${reference}`)
+  ].join("\n");
 }

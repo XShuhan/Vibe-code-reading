@@ -8,6 +8,7 @@ import { createId, nowIso } from "@code-vibe/shared";
 import type { PersistenceLayer } from "@code-vibe/persistence";
 
 import { assertModelConfigured } from "../config/settings";
+import { orchestrateQuestion } from "../agent/questionOrchestrator";
 import type { IndexService } from "./indexService";
 
 export class ThreadService {
@@ -45,14 +46,31 @@ export class ThreadService {
     const index = await this.indexService.ensureIndex();
     const { context, evidence } = buildSelectionQuestionContext(index, editorState, question);
     this.output.appendLine(`[retrieval] evidence_count=${evidence.length}`);
+    const orchestrated = orchestrateQuestion({
+      question,
+      editorState,
+      context,
+      evidence
+    });
+    this.output.appendLine(
+      `[agent] question_type=${orchestrated.questionType} skill=${orchestrated.skillId} evidence_count=${orchestrated.prioritizedEvidence.length}`
+    );
 
-    const answer = await answerGroundedQuestion(modelConfig, context, evidence);
+    const answer = await answerGroundedQuestion(modelConfig, context, orchestrated.prioritizedEvidence, {
+      systemInstruction: orchestrated.systemInstruction,
+      promptInstruction: orchestrated.promptInstruction,
+      questionType: orchestrated.questionType,
+      skillId: orchestrated.skillId,
+      structuredOutput: true
+    });
     const title = deriveThreadTitle(question, editorState.activeFile);
     const createdAt = nowIso();
     const thread: Thread = {
       id: createId("thread"),
       workspaceId: index.snapshot.id,
       title,
+      questionType: orchestrated.questionType,
+      skillId: orchestrated.skillId,
       createdAt,
       updatedAt: createdAt,
       contextRefs: [editorState.activeFile, ...answer.citations.map((citation) => citation.label)],
@@ -68,6 +86,7 @@ export class ThreadService {
           id: createId("message"),
           role: "assistant",
           content: answer.answerMarkdown,
+          structuredAnswer: answer.structuredAnswer,
           citations: answer.citations,
           createdAt
         }

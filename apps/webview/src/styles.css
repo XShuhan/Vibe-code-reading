@@ -111,6 +111,24 @@ select {
   font-size: 0.92rem;
 }
 
+.section-grid {
+  display: grid;
+  gap: 12px;
+}
+
+.thread-section {
+  border: 1px solid color-mix(in srgb, var(--vibe-border) 76%, transparent);
+  border-radius: 14px;
+  padding: 12px;
+  background: color-mix(in srgb, var(--vibe-bg) 75%, transparent);
+}
+
+.thread-section h3 {
+  margin: 0 0 8px;
+  font-size: 0.9rem;
+  color: var(--vibe-accent);
+}
+
 .eyebrow {
   margin: 0 0 8px;
   text-transform: uppercase;

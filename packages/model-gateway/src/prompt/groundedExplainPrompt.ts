@@ -1,6 +1,10 @@
 import type { EvidenceSpan, QuestionContext } from "@code-vibe/shared";
 
-export function groundedExplainPrompt(ctx: QuestionContext, evidence: EvidenceSpan[]): string {
+export function groundedExplainPrompt(
+  ctx: QuestionContext,
+  evidence: EvidenceSpan[],
+  promptInstruction?: string
+): string {
   const evidenceList = evidence
     .map(
       (item, index) =>
@@ -25,7 +29,8 @@ export function groundedExplainPrompt(ctx: QuestionContext, evidence: EvidenceSp
       ? `Selection: ${ctx.activeSelection.startLine}-${ctx.activeSelection.endLine}\n${ctx.activeSelection.text}`
       : "Selection: none",
     "",
-    evidenceList
+    evidenceList,
+    promptInstruction ? `\nAdditional instructions:\n${promptInstruction}` : ""
   ].join("\n");
 }
 
