@@ -9,7 +9,8 @@ export const COMMANDS = {
   traceCallPath: "vibe.traceCallPath",
   openThread: "vibe.openThread",
   openCard: "vibe.openCard",
-  openCitation: "vibe.openCitation"
+  openCitation: "vibe.openCitation",
+  openProjectOverview: "vibe.openProjectOverview"
 } as const;
 
 export const VIEWS = {

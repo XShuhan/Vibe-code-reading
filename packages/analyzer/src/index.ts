@@ -1,6 +1,7 @@
 import type { CodeEdge, CodeNode, TracePathResult, WorkspaceIndex } from "@code-vibe/shared";
 
 import { indexTypeScriptWorkspace } from "./ts/tsAnalyzer";
+export { getCallers, getCallees } from "./ts/callGraph";
 
 export async function indexWorkspace(rootUri: string): Promise<WorkspaceIndex> {
   return indexTypeScriptWorkspace(rootUri);

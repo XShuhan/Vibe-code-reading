@@ -10,20 +10,9 @@
   },
   "categories": ["Other"],
   "activationEvents": [
-    "onStartupFinished",
-    "onCommand:vibe.refreshIndex",
-    "onCommand:vibe.testModelConnection",
-    "onCommand:vibe.askAboutSelection",
-    "onCommand:vibe.explainCurrentSymbol",
-    "onCommand:vibe.saveSelectionAsCard",
-    "onCommand:vibe.openCanvas",
-    "onCommand:vibe.traceCallPath",
-    "onView:vibe.map",
-    "onView:vibe.threads",
-    "onView:vibe.cards"
+    "onStartupFinished"
   ],
   "main": "./dist/extension.js",
-  "icon": "media/icon.svg",
   "contributes": {
     "viewsContainers": {
       "activitybar": [
@@ -38,15 +27,18 @@
       "vibe": [
         {
           "id": "vibe.map",
-          "name": "Map"
+          "name": "Map",
+          "icon": "media/icon.svg"
         },
         {
           "id": "vibe.threads",
-          "name": "Threads"
+          "name": "Threads",
+          "icon": "media/icon.svg"
         },
         {
           "id": "vibe.cards",
-          "name": "Cards"
+          "name": "Cards",
+          "icon": "media/icon.svg"
         }
       ]
     },
@@ -108,6 +100,10 @@
       {
         "command": "vibe.openCitation",
         "title": "Vibe: Open Citation"
+      },
+      {
+        "command": "vibe.openProjectOverview",
+        "title": "Vibe: Open Project Overview"
       }
     ],
     "menus": {

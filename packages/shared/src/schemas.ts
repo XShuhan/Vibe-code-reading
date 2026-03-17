@@ -2,6 +2,10 @@ import type { CanvasRelation, CodeEdgeType, CodeNodeKind, ThreadRole } from "./t
 
 export const codeNodeKinds: CodeNodeKind[] = [
   "file",
+  "directory",
+  "overview",
+  "symbolGroup",
+  "callChain",
   "module",
   "class",
   "function",

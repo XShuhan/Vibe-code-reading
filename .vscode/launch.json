@@ -8,7 +8,7 @@
       "preLaunchTask": "code-vibe: build",
       "args": [
         "--extensionDevelopmentPath=${workspaceFolder}/apps/extension",
-        "/Users/xue/Projects/code-vibe-testing/workspace"
+        "${workspaceFolder}/~/Projects/code-vibe-testing/workspace"
       ],
       "outFiles": [
         "${workspaceFolder}/apps/extension/dist/**/*.js"

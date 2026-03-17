@@ -4,12 +4,15 @@
     {
       "label": "code-vibe: build",
       "type": "shell",
-      "command": "pnpm",
+      "command": "${env:APPDATA}\\npm\\pnpm.cmd",
       "args": [
         "build"
       ],
       "options": {
-        "cwd": "${workspaceFolder}"
+        "cwd": "${workspaceFolder}",
+        "env": {
+          "Path": "C:\\Program Files\\nodejs;${env:APPDATA}\\npm;${env:Path}"
+        }
       },
       "group": {
         "kind": "build",

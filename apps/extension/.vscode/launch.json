@@ -7,7 +7,7 @@
       "request": "launch",
       "args": [
         "--extensionDevelopmentPath=${workspaceFolder}",
-        "/Users/xue/Projects/code-vibe-testing/workspace"
+        "${workspaceFolder}/../~/Projects/code-vibe-testing/workspace"
       ],
       "outFiles": [
         "${workspaceFolder}/dist/**/*.js"

@@ -1,5 +1,9 @@
 export type CodeNodeKind =
   | "file"
+  | "directory"
+  | "overview"
+  | "symbolGroup"
+  | "callChain"
   | "module"
   | "class"
   | "function"

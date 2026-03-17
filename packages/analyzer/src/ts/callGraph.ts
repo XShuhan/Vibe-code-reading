@@ -1,4 +1,4 @@
-import type { CodeEdge, CodeNode } from "@code-vibe/shared";
+import type { CodeEdge, CodeNode, WorkspaceIndex } from "@code-vibe/shared";
 import type { CallReference } from "../core/analysisTypes";
 
 export function buildCallEdges(
@@ -58,6 +58,33 @@ export function buildCallEdges(
   }
 
   return [...edges.values()];
+}
+
+export function getCallers(index: WorkspaceIndex, nodeId: string): CodeNode[] {
+  return resolveRelatedNodes(
+    index,
+    index.edges.filter((edge) => edge.type === "calls" && edge.toNodeId === nodeId).map((edge) => edge.fromNodeId)
+  );
+}
+
+export function getCallees(index: WorkspaceIndex, nodeId: string): CodeNode[] {
+  return resolveRelatedNodes(
+    index,
+    index.edges.filter((edge) => edge.type === "calls" && edge.fromNodeId === nodeId).map((edge) => edge.toNodeId)
+  );
+}
+
+function resolveRelatedNodes(index: WorkspaceIndex, nodeIds: string[]): CodeNode[] {
+  const nodeById = new Map(index.nodes.map((node) => [node.id, node]));
+  const uniqueIds = new Set(nodeIds);
+  const nodes: CodeNode[] = [];
+  for (const id of uniqueIds) {
+    const node = nodeById.get(id);
+    if (node && node.kind !== "file") {
+      nodes.push(node);
+    }
+  }
+  return nodes.sort((left, right) => left.path.localeCompare(right.path) || left.name.localeCompare(right.name));
 }
 
 function resolveTargets(reference: CallReference, nodesByName: Map<string, CodeNode[]>): CodeNode[] {

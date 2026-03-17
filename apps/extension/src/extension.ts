@@ -9,6 +9,7 @@ import { registerAddThreadAnswerToCanvasCommand } from "./commands/addThreadAnsw
 import { registerAskAboutSelectionCommand } from "./commands/askAboutSelection";
 import { registerExplainCurrentSymbolCommand } from "./commands/explainCurrentSymbol";
 import { registerOpenCanvasCommand } from "./commands/openCanvas";
+import { registerOpenProjectOverviewCommand } from "./commands/openProjectOverview";
 import { registerRefreshIndexCommand } from "./commands/refreshIndex";
 import { registerSaveSelectionAsCardCommand } from "./commands/saveSelectionAsCard";
 import { registerTestModelConnectionCommand } from "./commands/testModelConnection";
@@ -114,6 +115,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
   registerSaveSelectionAsCardCommand(context, indexService, cardService, controller);
   registerAddThreadAnswerToCanvasCommand(context, threadService, cardService, canvasService, controller);
   registerOpenCanvasCommand(context, controller);
+  registerOpenProjectOverviewCommand(context, indexService);
   registerTraceCallPathCommand(context, indexService, cardService, controller);
 }
 
