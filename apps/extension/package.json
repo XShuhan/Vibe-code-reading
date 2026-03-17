@@ -12,6 +12,9 @@
   "activationEvents": [
     "onStartupFinished"
   ],
+  "enabledApiProposals": [
+    "editorInsets"
+  ],
   "main": "./dist/extension.js",
   "contributes": {
     "viewsContainers": {
@@ -104,6 +107,14 @@
       {
         "command": "vibe.openProjectOverview",
         "title": "Vibe: Open Project Overview"
+      }
+    ],
+    "keybindings": [
+      {
+        "command": "vibe.askAboutSelection",
+        "key": "ctrl+alt+q",
+        "mac": "cmd+alt+q",
+        "when": "editorTextFocus && editorHasSelection"
       }
     ],
     "menus": {

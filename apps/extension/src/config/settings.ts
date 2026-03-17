@@ -2,6 +2,18 @@ import * as vscode from "vscode";
 
 import type { ModelConfig } from "@code-vibe/shared";
 
+type RequiredThreadModelField = "baseUrl" | "apiKey" | "model";
+
+export type ThreadModelReadiness =
+  | {
+      isReady: true;
+    }
+  | {
+      isReady: false;
+      reason: "mock-provider" | "missing-fields";
+      missingFields: RequiredThreadModelField[];
+    };
+
 const DEFAULT_MODEL_CONFIG: ModelConfig = {
   provider: "mock",
   baseUrl: "https://api.moonshot.cn/v1",
@@ -22,6 +34,31 @@ export function getModelConfig(): ModelConfig {
     temperature: config.get<number>("temperature", DEFAULT_MODEL_CONFIG.temperature),
     maxTokens: config.get<number>("maxTokens", DEFAULT_MODEL_CONFIG.maxTokens)
   };
+}
+
+export function evaluateThreadModelReadiness(modelConfig: ModelConfig): ThreadModelReadiness {
+  if (modelConfig.provider === "mock") {
+    return {
+      isReady: false,
+      reason: "mock-provider",
+      missingFields: []
+    };
+  }
+
+  const missingFields = (["baseUrl", "apiKey", "model"] as const).filter((field) => {
+    const value = modelConfig[field];
+    return typeof value !== "string" || value.trim().length === 0;
+  });
+
+  if (missingFields.length > 0) {
+    return {
+      isReady: false,
+      reason: "missing-fields",
+      missingFields
+    };
+  }
+
+  return { isReady: true };
 }
 
 export function assertModelConfigured(modelConfig: ModelConfig): void {

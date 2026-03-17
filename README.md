@@ -101,7 +101,8 @@ _Coming soon_
    - Type your question
    - View the answer in the Threads view
 
-Default behavior after cloning is `mock` mode, so the full demo flow works without any API key.
+Default behavior after cloning is `mock` mode, so you can explore the full flow without any API key.
+At startup, the extension shows a reminder if `vibe.model` is not fully configured for real thread model usage.
 If you want real model responses in every project, configure the key once in VS Code User Settings rather than per-workspace settings.
 
 5. **Save understanding**
@@ -144,6 +145,19 @@ If you want real model responses in every project, configure the key once in VS 
 
 ## Settings Reference
 
+### Shortcut Configuration
+
+`Vibe: Ask About Selection` ships with a default shortcut:
+
+- Windows/Linux: `Ctrl+Alt+Q`
+- macOS: `Cmd+Alt+Q`
+
+If you want to customize it:
+
+1. Open **Keyboard Shortcuts**.
+2. Search `@command:vibe.askAboutSelection`.
+3. Bind your preferred key and run **Show Same Keybindings** to check conflicts.
+
 ### Model Configuration
 
 ```jsonc
@@ -168,6 +182,8 @@ If you want real model responses in every project, configure the key once in VS 
 }
 ```
 
+When thread model configuration is incomplete, Code Vibe Reading shows a startup warning with an `Open Vibe Settings` action. This opens the VS Code Settings UI filtered by `vibe.model`.
+
 ### Using Mock Provider (Offline)
 
 For development or demo without API access:
@@ -184,7 +200,8 @@ The mock provider returns template responses useful for testing UI flows.
 
 If you want `Ask About Selection` to work across any folder you open, set the model configuration in **VS Code User Settings** once.
 
-Open Command Palette → `Preferences: Open User Settings (JSON)` and add:
+Open Settings (`Ctrl+,` / `Cmd+,`), search for `vibe.model`, and set these fields in User Settings.
+If you prefer JSON directly, open Command Palette → `Preferences: Open User Settings (JSON)` and add:
 
 ```jsonc
 {

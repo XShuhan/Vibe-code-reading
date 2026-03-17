@@ -14,6 +14,7 @@ import { registerRefreshIndexCommand } from "./commands/refreshIndex";
 import { registerSaveSelectionAsCardCommand } from "./commands/saveSelectionAsCard";
 import { registerTestModelConnectionCommand } from "./commands/testModelConnection";
 import { registerTraceCallPathCommand } from "./commands/traceCallPath";
+import { evaluateThreadModelReadiness, getModelConfig } from "./config/settings";
 import { CardService } from "./services/cardService";
 import { CanvasService } from "./services/canvasService";
 import { IndexService } from "./services/indexService";
@@ -22,6 +23,9 @@ import { VibeController } from "./services/vibeController";
 import { CardsViewProvider } from "./views/cardsView";
 import { MapViewProvider } from "./views/mapView";
 import { ThreadsViewProvider } from "./views/threadsView";
+
+const OPEN_VIBE_SETTINGS_ACTION = "Open Vibe Settings";
+let hasShownStartupModelReminder = false;
 
 export async function activate(context: vscode.ExtensionContext): Promise<void> {
   const output = vscode.window.createOutputChannel("Code Vibe Reading");
@@ -46,6 +50,8 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
     );
     return;
   }
+
+  maybeShowStartupModelReminder();
 
   const storageUri =
     context.storageUri ?? vscode.Uri.joinPath(context.globalStorageUri, "workspace");
@@ -120,3 +126,44 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
 }
 
 export function deactivate(): void {}
+
+function maybeShowStartupModelReminder(): void {
+  if (hasShownStartupModelReminder) {
+    return;
+  }
+
+  const readiness = evaluateThreadModelReadiness(getModelConfig());
+  if (readiness.isReady) {
+    return;
+  }
+
+  hasShownStartupModelReminder = true;
+  const message = buildThreadModelReminderMessage(readiness);
+
+  void vscode.window
+    .showWarningMessage(message, OPEN_VIBE_SETTINGS_ACTION)
+    .then(async (selection) => {
+      if (selection === OPEN_VIBE_SETTINGS_ACTION) {
+        await vscode.commands.executeCommand("workbench.action.openSettings", "vibe.model");
+      }
+    });
+}
+
+function buildThreadModelReminderMessage(
+  readiness: Exclude<ReturnType<typeof evaluateThreadModelReadiness>, { isReady: true }>
+): string {
+  if (readiness.reason === "mock-provider") {
+    return [
+      "Thread model configuration is incomplete.",
+      "vibe.model.provider is currently set to \"mock\".",
+      "Configure vibe.model settings to use a real model endpoint for grounded thread answers."
+    ].join(" ");
+  }
+
+  const missing = readiness.missingFields.map((field) => `vibe.model.${field}`).join(", ");
+  return [
+    "Thread model configuration is incomplete.",
+    `Missing required settings: ${missing}.`,
+    "Open Vibe Settings to finish setup."
+  ].join(" ");
+}

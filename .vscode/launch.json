@@ -8,6 +8,7 @@
       "preLaunchTask": "code-vibe: build",
       "args": [
         "--extensionDevelopmentPath=${workspaceFolder}/apps/extension",
+        "--enable-proposed-api=local.code-vibe-reading-extension",
         "${workspaceFolder}/~/Projects/code-vibe-testing/workspace"
       ],
       "outFiles": [
