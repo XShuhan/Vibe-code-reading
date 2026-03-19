@@ -5,7 +5,9 @@ import { getCallers, getCallees, getNodeChildren } from "@code-vibe/analyzer";
 import { COMMANDS } from "@code-vibe/shared";
 import type { CodeNode, WorkspaceIndex } from "@code-vibe/shared";
 
+import { getCachedWorkspaceLanguage, onDidChangeWorkspacePreferences } from "../config/settings";
 import type { IndexService } from "../services/indexService";
+import type { ProjectOverviewService } from "../services/projectOverviewService";
 
 interface DirectoryNode {
   id: string;
@@ -83,22 +85,34 @@ export class MapViewProvider implements vscode.TreeDataProvider<MapNode> {
 
   readonly onDidChangeTreeData = this.emitter.event;
 
-  constructor(private readonly indexService: IndexService) {
+  constructor(
+    private readonly indexService: IndexService,
+    private readonly projectOverviewService: ProjectOverviewService
+  ) {
     this.indexService.onDidChange(() => this.emitter.fire(undefined));
+    this.projectOverviewService.onDidChange(() => this.emitter.fire(undefined));
+    onDidChangeWorkspacePreferences(() => this.emitter.fire(undefined));
   }
 
   getTreeItem(node: MapNode): vscode.TreeItem {
     if (isOverviewNode(node)) {
+      const overview = this.projectOverviewService.getOverview();
+      const status = this.projectOverviewService.getStatus();
       const item = new vscode.TreeItem(
-        node.name,
+        localizeOverviewLabel(),
         vscode.TreeItemCollapsibleState.None
       );
-      item.description = this.indexService.getProjectSummary()?.primaryLanguage ?? "overview";
-      item.tooltip = "Project overview";
+      item.description = describeOverviewStatus(
+        status,
+        overview?.sourceRevision === this.indexService.getIndex()?.snapshot.revision
+          ? undefined
+          : this.indexService.getProjectSummary()?.primaryLanguage
+      );
+      item.tooltip = localizeOverviewTooltip(status);
       item.iconPath = new vscode.ThemeIcon(themeIconForNode(node.kind));
       item.command = {
         command: COMMANDS.openProjectOverview,
-        title: "Open Project Overview"
+        title: getCachedWorkspaceLanguage() === "zh-CN" ? "打开项目概览" : "Open Project Overview"
       };
       return item;
     }
@@ -419,9 +433,50 @@ function createOverviewNode(workspaceId: string): OverviewNode {
   return {
     id: `${workspaceId}:overview`,
     kind: "overview",
-    name: "Project Overview",
+    name: localizeOverviewLabel(),
     path: "overview"
   };
+}
+
+function localizeOverviewLabel(): string {
+  return getCachedWorkspaceLanguage() === "zh-CN" ? "项目概览" : "Project Overview";
+}
+
+function describeOverviewStatus(
+  status: ReturnType<ProjectOverviewService["getStatus"]>,
+  fallback: string | undefined
+): string {
+  const language = getCachedWorkspaceLanguage();
+  if (status === "generating") {
+    return language === "zh-CN" ? "分析中" : "Analyzing";
+  }
+  if (status === "stale") {
+    return language === "zh-CN" ? "待刷新" : "Stale";
+  }
+  if (status === "error") {
+    return language === "zh-CN" ? "生成失败" : "Error";
+  }
+  return fallback ?? "AI";
+}
+
+function localizeOverviewTooltip(status: ReturnType<ProjectOverviewService["getStatus"]>): string {
+  const language = getCachedWorkspaceLanguage();
+  if (status === "generating") {
+    return language === "zh-CN"
+      ? "正在根据最新索引生成 AI 项目概览"
+      : "Generating an AI project overview from the latest index";
+  }
+  if (status === "stale") {
+    return language === "zh-CN"
+      ? "索引或语言已变更，请刷新以重新生成项目概览"
+      : "The index or language changed. Refresh to regenerate the project overview.";
+  }
+  if (status === "error") {
+    return language === "zh-CN"
+      ? "项目概览生成失败，点击查看详情"
+      : "Project overview generation failed. Click to inspect details.";
+  }
+  return language === "zh-CN" ? "项目概览" : "Project overview";
 }
 
 function createCallDirectionNode(
@@ -552,4 +607,3 @@ function buildDirectoryTree(files: string[]): {
 function toPosixPath(filePath: string): string {
   return filePath.split(path.sep).join(path.posix.sep);
 }
-

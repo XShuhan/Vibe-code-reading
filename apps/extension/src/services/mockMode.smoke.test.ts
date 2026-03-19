@@ -107,6 +107,54 @@ describe("mock mode smoke test", () => {
     expect(card.summary).toContain("Source references");
     expect(canvas.nodes.some((node) => node.cardId === card.id)).toBe(true);
   });
+
+  it("deletes a persisted thread", async () => {
+    const [{ IndexService }, { ThreadService }] = await Promise.all([
+      import("./indexService"),
+      import("./threadService")
+    ]);
+
+    const workspaceRoot = await makeFixtureWorkspace();
+    createdPaths.push(workspaceRoot);
+
+    const storageRoot = await fs.mkdtemp(path.join(os.tmpdir(), "vibe-extension-smoke-"));
+    createdPaths.push(storageRoot);
+    await ensureWorkspaceStorage(storageRoot);
+
+    const output = {
+      appendLine: vi.fn()
+    };
+
+    const persistence = createWorkspacePersistence(storageRoot, "workspace");
+    const indexService = new IndexService(workspaceRoot, persistence, output as never);
+    const threadService = new ThreadService(persistence, indexService, output as never);
+
+    await Promise.all([indexService.initialize(), threadService.initialize()]);
+
+    const mockConfig: ModelConfig = {
+      provider: "mock",
+      baseUrl: "",
+      apiKey: "",
+      model: "mock-grounded",
+      temperature: 0.1,
+      maxTokens: 1024
+    };
+
+    const thread = await threadService.askQuestion(
+      "What does this module do?",
+      {
+        activeFile: "src/auth.ts",
+        startLine: 1,
+        endLine: 3,
+        selectedText: "export function createSession(userId: string) { return issueToken(userId); }"
+      },
+      mockConfig
+    );
+
+    await expect(threadService.deleteThread(thread.id)).resolves.toBe(true);
+    expect(threadService.getThreads()).toEqual([]);
+    await expect(persistence.loadThreads()).resolves.toEqual([]);
+  });
 });
 
 async function makeFixtureWorkspace(name = "sample-ts-repo"): Promise<string> {

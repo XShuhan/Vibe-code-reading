@@ -177,6 +177,8 @@ export class VibeController implements vscode.Disposable {
           title: `Thread: ${thread.title}`,
           thread
         });
+      } else {
+        panel.dispose();
       }
     }
 

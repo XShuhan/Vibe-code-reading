@@ -93,7 +93,7 @@ _Coming soon_
 
 3. **Build the code map**
    - Click "Refresh Index" in the Map view
-   - Wait for indexing to complete
+   - Wait for indexing and AI project-overview generation to complete
 
 4. **Ask about code**
    - Select code in the editor
@@ -101,9 +101,14 @@ _Coming soon_
    - Type your question
    - View the answer in the Threads view
 
-Default behavior after cloning is `mock` mode, so you can explore the full flow without any API key.
-At startup, the extension shows a reminder if `vibe.model` is not fully configured for real thread model usage.
-If you want real model responses in every project, configure the key once in VS Code User Settings rather than per-workspace settings.
+The first time you use the extension after installing it, it will ask you to:
+- choose a language: Chinese or English
+- configure your API: `baseUrl`, `apiKey`, and `model`
+
+That configuration is stored as extension-level state in VS Code, so:
+- `git pull` will not overwrite it
+- opening a different project does not require configuring the API again
+- recloning a project does not require configuring the API again
 
 5. **Save understanding**
    - Select code or use a thread answer
@@ -121,13 +126,16 @@ If you want real model responses in every project, configure the key once in VS 
 
 | Command | Description | Shortcut |
 |---------|-------------|----------|
-| `Vibe: Refresh Index` | Rebuild workspace index | - |
+| `Vibe: Refresh Index` | Rebuild workspace index and regenerate the AI project overview | - |
+| `Vibe: Configure API` | Choose language and update API settings for the extension | - |
 | `Vibe: Test Model Connection` | Verify current model settings and log provider diagnostics | - |
 | `Vibe: Ask About Selection` | Ask question about selected code | - |
 | `Vibe: Explain Current Symbol` | Explain symbol under cursor | - |
 | `Vibe: Save Selection as Card` | Save selection as a card | - |
 | `Vibe: Add Thread Answer to Canvas` | Add thread to canvas | - |
+| `Vibe: Delete Thread` | Delete the selected thread | `Delete` / `Backspace` in Threads view |
 | `Vibe: Open Canvas` | Open canvas view | - |
+| `Vibe: Open Project Overview` | Open the current project's generated overview | - |
 | `Vibe: Trace Call Path` | Trace callers/callees | - |
 
 ### Views
@@ -143,7 +151,7 @@ If you want real model responses in every project, configure the key once in VS 
 - **CodeLens**: "Explain symbol" appears above functions/classes
 - **Click Citations**: Jump to source from any citation
 
-## Settings Reference
+## Workspace Setup
 
 ### Shortcut Configuration
 
@@ -158,150 +166,98 @@ If you want to customize it:
 2. Search `@command:vibe.askAboutSelection`.
 3. Bind your preferred key and run **Show Same Keybindings** to check conflicts.
 
-### Model Configuration
+### First-Time Configuration
 
-```jsonc
-{
-  // Provider type: "openai-compatible" or "mock"
-  "vibe.model.provider": "openai-compatible",
-  
-  // Base URL for OpenAI-compatible API
-  "vibe.model.baseUrl": "https://api.openai.com/v1",
-  
-  // API key (keep secret!)
-  "vibe.model.apiKey": "your-api-key",
-  
-  // Model identifier
-  "vibe.model.model": "gpt-4",
-  
-  // Sampling temperature (0-2)
-  "vibe.model.temperature": 0.1,
-  
-  // Maximum tokens in response
-  "vibe.model.maxTokens": 900
-}
+When the extension starts for the first time, it asks for:
+- language: `中文` or `English`
+- `baseUrl`
+- `apiKey`
+- `model`
+
+You can reopen that flow later with:
+
+```text
+Vibe: Configure API
 ```
 
-When thread model configuration is incomplete, Code Vibe Reading shows a startup warning with an `Open Vibe Settings` action. This opens the VS Code Settings UI filtered by `vibe.model`.
+The current project stores only its local indexed data here:
 
-### Using Mock Provider (Offline)
-
-For development or demo without API access:
-
-```jsonc
-{
-  "vibe.model.provider": "mock"
-}
+```text
+.code-vibe/storage/
 ```
 
-The mock provider returns template responses useful for testing UI flows.
+These files are local project state, not repository state. The repository `.gitignore` excludes `.code-vibe/`.
 
-### Using Moonshot Globally
+### Local Data Behavior
 
-If you want `Ask About Selection` to work across any folder you open, set the model configuration in **VS Code User Settings** once.
+- `storage/` stores threads, cards, canvas state, and the cached index
+- API configuration and language are stored by the extension globally and reused across projects
+- `git pull` does not affect either the global extension config or the local project storage
+- deleting the project folder removes these files
+- recloning the project starts with empty project storage, but your API configuration stays available in the extension
 
-Open Settings (`Ctrl+,` / `Cmd+,`), search for `vibe.model`, and set these fields in User Settings.
-If you prefer JSON directly, open Command Palette → `Preferences: Open User Settings (JSON)` and add:
+### Example API Endpoints
 
-```jsonc
-{
-  "vibe.model.provider": "openai-compatible",
-  "vibe.model.baseUrl": "https://api.moonshot.cn/v1",
-  "vibe.model.apiKey": "your-moonshot-api-key",
-  "vibe.model.model": "kimi-k2-0905-preview",
-  "vibe.model.temperature": 0.1,
-  "vibe.model.maxTokens": 8192
-}
-```
+Common combinations:
 
-This keeps the secret out of the repository and makes the extension usable in every project without repeating workspace-level setup.
+- Kimi Code
+  - `baseUrl`: `https://api.kimi.com/coding/v1`
+  - `model`: `kimi-for-coding`
+- Moonshot Open Platform
+  - `baseUrl`: `https://api.moonshot.cn/v1`
+  - `model`: your enabled Moonshot model id
+- OpenClaw gateway
+  - `baseUrl`: `http://127.0.0.1:19001/v1`
+  - `model`: `openclaw:<agentId>` or `openclaw:main`
+- Local OpenAI-compatible endpoint
+  - `baseUrl`: for example `http://localhost:11434/v1`
+  - `model`: whatever your local server exposes
 
-### Using Kimi Code Directly
+### Diagnose Connectivity
 
-Kimi Code officially documents an OpenAI-compatible endpoint for third-party coding agents:
+Run `Vibe: Test Model Connection` from the command palette after configuring the extension.
 
-```jsonc
-{
-  "vibe.model.provider": "openai-compatible",
-  "vibe.model.baseUrl": "https://api.kimi.com/coding/v1",
-  "vibe.model.apiKey": "your-kimi-code-api-key",
-  "vibe.model.model": "kimi-for-coding",
-  "vibe.model.maxTokens": 32768
-}
-```
+The command:
+- validates that `baseUrl`, `apiKey`, and `model` are present
+- issues a minimal chat completion request
+- writes provider, base URL, model id, masked key, discovered models, and response text to the `Code Vibe Reading` output channel
 
-This matches Kimi Code's Roo Code guidance: use the OpenAI-compatible provider with the `/coding/v1` entrypoint and `kimi-for-coding`.
+## Project Overview
 
-Note: Kimi Code's membership docs explicitly describe Claude Code and Roo Code as the supported third-party agent targets, and recommend Moonshot Open Platform for broader enterprise or custom product integrations.
+`Project Overview` is now AI-generated when you run `Vibe: Refresh Index`.
 
-### Using Moonshot Open Platform
+The generation flow is:
+- the analyzer refreshes the workspace index
+- the extension builds a grounded dossier from repository signals and indexed code
+- an internal prompt bundle asks the model to explain:
+  - what the whole project does
+  - how the startup path works in code
+  - which key modules are involved
+  - what the end-to-end execution flow looks like
+- the result is stored in the project's `.code-vibe/storage/project-overview.json`
 
-Moonshot Open Platform exposes an OpenAI-compatible Chat Completions API at `https://api.moonshot.cn/v1/chat/completions`. For this extension, use the `/v1` base URL and the exact model id enabled in your Moonshot account.
+The dossier currently includes:
+- repository hints such as `README.md` and `package.json`
+- likely entry files
+- symbol outlines for key files
+- grounded code excerpts from startup and high-signal files
+- index-derived hints such as core directories, core modules, and high-frequency functions
 
-```jsonc
-{
-  "vibe.model.provider": "openai-compatible",
-  "vibe.model.baseUrl": "https://api.moonshot.cn/v1",
-  "vibe.model.apiKey": "your-moonshot-api-key",
-  "vibe.model.model": "kimi-k2-0905-preview",
-  "vibe.model.maxTokens": 8192
-}
-```
+The panel renders four developer-focused sections:
+- project goal and implementation narrative
+- startup entry and startup code logic
+- key code modules
+- execution flow with a Mermaid flowchart source block
 
-If your account has the faster K2 variant enabled, Moonshot's official platform posts also reference `kimi-k2-turbo-preview` as a valid API model.
-
-### Using OpenClaw Gateway
-
-If you want to route requests through OpenClaw, keep this extension on the standard OpenAI-compatible path and target an OpenClaw agent:
-
-```jsonc
-{
-  "vibe.model.provider": "openai-compatible",
-  "vibe.model.baseUrl": "http://127.0.0.1:19001/v1",
-  "vibe.model.apiKey": "your-openclaw-gateway-token",
-  "vibe.model.model": "openclaw:main"
-}
-```
-
-`openclaw:main` uses whatever model your OpenClaw `main` agent is configured to run. To use Kimi K2.5 through OpenClaw, point `main` at K2.5 or create a dedicated agent and set `vibe.model.model` to `openclaw:<agentId>`.
-
-Make sure OpenClaw's HTTP API is enabled in your OpenClaw config:
-```jsonc
-{
-  "gateway": {
-    "http": {
-      "endpoints": {
-        "chatCompletions": { "enabled": true }
-      }
-    }
-  }
-}
-```
-
-### Supported Providers
-
-Any OpenAI-compatible endpoint:
-- OpenAI (GPT-4, GPT-3.5)
-- Azure OpenAI
-- Local models (llama.cpp, Ollama, etc.)
-- OpenClaw-compatible endpoints (with Kimi, Claude, etc.)
-- Kimi-compatible endpoints (requires Coding Agent access)
-
-Example for local Ollama:
-```jsonc
-{
-  "vibe.model.provider": "openai-compatible",
-  "vibe.model.baseUrl": "http://localhost:11434/v1",
-  "vibe.model.apiKey": "ollama",
-  "vibe.model.model": "codellama"
-}
-```
+The display language follows the language chosen during configuration:
+- Chinese setup → Chinese overview text
+- English setup → English overview text
 
 ## Publishing To GitHub
 
 Before pushing:
-- Keep `vibe.model.apiKey` empty in the repository.
-- Store real API keys only in VS Code User Settings or another local secret store.
+- Keep `.code-vibe/` out of version control.
+- Store real API keys only in the extension's own secure storage.
 - If a secret was ever committed, rotate it before publishing.
 
 Typical flow:
@@ -334,15 +290,6 @@ ssh-keygen -t ed25519 -C "your_email@example.com"
 
 Then copy the `.pub` file contents into GitHub:
 - GitHub → Settings → SSH and GPG keys → New SSH key
-
-### Diagnose Connectivity
-
-Run `Vibe: Test Model Connection` from the command palette after updating your settings.
-
-The command:
-- validates that `baseUrl`, `apiKey`, and `model` are present
-- issues a minimal chat completion request
-- writes provider, base URL, model id, masked key, discovered models, and response text to the `Code Vibe Reading` output channel
 
 ## Project Structure
 

@@ -1,8 +1,9 @@
 import * as vscode from "vscode";
 
+import { COMMANDS } from "@code-vibe/shared";
 import type { EditorSelectionState, Thread } from "@code-vibe/shared";
 
-import { evaluateThreadModelReadiness, getModelConfig } from "../config/settings";
+import { ensureModelConfigured } from "../config/settings";
 import { getActiveSelectionState } from "../editor/selectionContext";
 import type { IndexService } from "../services/indexService";
 import type { ThreadService } from "../services/threadService";
@@ -67,7 +68,6 @@ type CreateWebviewTextEditorInset = (
 ) => WebviewEditorInsetLike;
 
 const INLINE_INSET_HEIGHT = 4;
-const OPEN_VIBE_SETTINGS_ACTION = "Open Vibe Settings";
 
 export function registerAskAboutSelectionCommand(
   context: vscode.ExtensionContext,
@@ -75,16 +75,17 @@ export function registerAskAboutSelectionCommand(
   threadService: ThreadService,
   controller: VibeController
 ): void {
-  const composer = createSelectionComposer(indexService, threadService, controller);
+  const composer = createSelectionComposer(context, indexService, threadService, controller);
 
   context.subscriptions.push(
-    vscode.commands.registerCommand("vibe.askAboutSelection", async () => {
+    vscode.commands.registerCommand(COMMANDS.askAboutSelection, async () => {
       await composer.open();
     })
   );
 }
 
 export async function askAboutSelection(
+  context: vscode.ExtensionContext,
   indexService: IndexService,
   threadService: ThreadService,
   controller: VibeController,
@@ -102,7 +103,7 @@ export async function askAboutSelection(
   }
 
   try {
-    return await executeAskAboutSelection(threadService, controller, editorState, question);
+    return await executeAskAboutSelection(context, threadService, controller, editorState, question);
   } catch (error) {
     vscode.window.showErrorMessage(String(error));
     return undefined;
@@ -110,13 +111,14 @@ export async function askAboutSelection(
 }
 
 function createSelectionComposer(
+  context: vscode.ExtensionContext,
   indexService: IndexService,
   threadService: ThreadService,
   controller: VibeController
 ): {
   open: () => Promise<void>;
 } {
-  const fallbackComposer = createPanelComposer(threadService, controller);
+  const fallbackComposer = createPanelComposer(context, threadService, controller);
 
   let inlineInset: WebviewEditorInsetLike | undefined;
   let inlineSnapshot: EditorSelectionState | null = null;
@@ -250,8 +252,10 @@ function createSelectionComposer(
 
         inlineInFlight = true;
         try {
-          await executeAskAboutSelection(threadService, controller, inlineSnapshot, question);
-          inset.dispose();
+          const thread = await executeAskAboutSelection(context, threadService, controller, inlineSnapshot, question);
+          if (thread) {
+            inset.dispose();
+          }
         } catch (error) {
           const errorText = String(error);
           vscode.window.showErrorMessage(errorText);
@@ -287,6 +291,7 @@ function createSelectionComposer(
 }
 
 function createPanelComposer(
+  context: vscode.ExtensionContext,
   threadService: ThreadService,
   controller: VibeController
 ): {
@@ -389,8 +394,10 @@ function createPanelComposer(
 
         inFlight = true;
         try {
-          await executeAskAboutSelection(threadService, controller, editorStateSnapshot, question);
-          panel.dispose();
+          const thread = await executeAskAboutSelection(context, threadService, controller, editorStateSnapshot, question);
+          if (thread) {
+            panel.dispose();
+          }
         } catch (error) {
           const errorText = String(error);
           vscode.window.showErrorMessage(errorText);
@@ -445,45 +452,20 @@ function getCreateWebviewTextEditorInset(): CreateWebviewTextEditorInset | undef
 }
 
 async function executeAskAboutSelection(
+  context: vscode.ExtensionContext,
   threadService: ThreadService,
   controller: VibeController,
   editorState: EditorSelectionState,
   question: string
-): Promise<Thread> {
-  const modelConfig = getModelConfig();
-  await maybeShowThreadModelReminder(modelConfig);
+): Promise<Thread | undefined> {
+  const modelConfig = await ensureModelConfigured(context, "ask");
+  if (!modelConfig) {
+    return undefined;
+  }
+
   const thread = await threadService.askQuestion(question, editorState, modelConfig);
   await controller.openThread(thread.id);
   return thread;
-}
-
-async function maybeShowThreadModelReminder(
-  modelConfig: ReturnType<typeof getModelConfig>
-): Promise<void> {
-  const readiness = evaluateThreadModelReadiness(modelConfig);
-  if (readiness.isReady) {
-    return;
-  }
-
-  const message =
-    readiness.reason === "mock-provider"
-      ? [
-          "Thread model configuration is incomplete.",
-          "vibe.model.provider is currently set to \"mock\".",
-          "Configure vibe.model settings to use a real model endpoint for grounded thread answers."
-        ].join(" ")
-      : [
-          "Thread model configuration is incomplete.",
-          `Missing required settings: ${readiness.missingFields
-            .map((field) => `vibe.model.${field}`)
-            .join(", ")}.`,
-          "Open Vibe Settings to finish setup."
-        ].join(" ");
-
-  const selection = await vscode.window.showWarningMessage(message, OPEN_VIBE_SETTINGS_ACTION);
-  if (selection === OPEN_VIBE_SETTINGS_ACTION) {
-    await vscode.commands.executeCommand("workbench.action.openSettings", "vibe.model");
-  }
 }
 
 function buildPanelHydrationPayload(editorState: EditorSelectionState): PanelHydrationPayload {

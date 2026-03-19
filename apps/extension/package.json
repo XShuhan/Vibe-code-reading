@@ -52,7 +52,7 @@
       },
       {
         "view": "vibe.threads",
-        "contents": "Ask grounded questions about code selections and keep the answers here.\n[Ask About Selection](command:vibe.askAboutSelection)"
+        "contents": "Ask grounded questions about code selections and keep the answers here.\n[Configure API](command:vibe.configureModel)\n[Ask About Selection](command:vibe.askAboutSelection)"
       },
       {
         "view": "vibe.cards",
@@ -69,6 +69,10 @@
         "title": "Vibe: Test Model Connection"
       },
       {
+        "command": "vibe.configureModel",
+        "title": "Vibe: Configure API"
+      },
+      {
         "command": "vibe.askAboutSelection",
         "title": "Vibe: Ask About Selection"
       },
@@ -83,6 +87,10 @@
       {
         "command": "vibe.addThreadAnswerToCanvas",
         "title": "Vibe: Add Thread Answer to Canvas"
+      },
+      {
+        "command": "vibe.deleteThread",
+        "title": "Delete Thread"
       },
       {
         "command": "vibe.openCanvas",
@@ -115,6 +123,12 @@
         "key": "ctrl+alt+q",
         "mac": "cmd+alt+q",
         "when": "editorTextFocus && editorHasSelection"
+      },
+      {
+        "command": "vibe.deleteThread",
+        "key": "delete",
+        "mac": "backspace",
+        "when": "focusedView == vibe.threads && listFocus && !inputFocus"
       }
     ],
     "menus": {
@@ -138,9 +152,16 @@
           "group": "navigation@2"
         }
       ],
+      "view/title": [
+        {
+          "command": "vibe.configureModel",
+          "when": "view == vibe.threads",
+          "group": "navigation"
+        }
+      ],
       "view/item/context": [
         {
-          "command": "vibe.openThread",
+          "command": "vibe.deleteThread",
           "when": "view == vibe.threads",
           "group": "inline"
         },
@@ -159,28 +180,6 @@
     "configuration": {
       "title": "Code Vibe Reading",
       "properties": {
-        "vibe.model.provider": {
-          "type": "string",
-          "default": "mock",
-          "enum": ["openai-compatible", "mock"],
-          "description": "Model gateway provider."
-        },
-        "vibe.model.baseUrl": {
-          "type": "string",
-          "default": "https://api.moonshot.cn/v1",
-          "description": "Base URL for the OpenAI-compatible endpoint."
-        },
-        "vibe.model.apiKey": {
-          "type": "string",
-          "default": "",
-          "scope": "machine",
-          "description": "API key for the configured model endpoint. Set this in User Settings, not in workspace settings."
-        },
-        "vibe.model.model": {
-          "type": "string",
-          "default": "kimi-k2-0905-preview",
-          "description": "Model identifier."
-        },
         "vibe.model.temperature": {
           "type": "number",
           "default": 0.1,

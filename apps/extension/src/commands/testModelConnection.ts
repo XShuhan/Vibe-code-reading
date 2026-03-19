@@ -3,7 +3,7 @@ import * as vscode from "vscode";
 import { COMMANDS } from "@code-vibe/shared";
 import { testModelConnection } from "@code-vibe/model-gateway";
 
-import { assertModelConfigured, getModelConfig } from "../config/settings";
+import { assertModelConfigured, ensureModelConfigured } from "../config/settings";
 
 export function registerTestModelConnectionCommand(
   context: vscode.ExtensionContext,
@@ -11,7 +11,10 @@ export function registerTestModelConnectionCommand(
 ): void {
   context.subscriptions.push(
     vscode.commands.registerCommand(COMMANDS.testModelConnection, async () => {
-      const modelConfig = getModelConfig();
+      const modelConfig = await ensureModelConfigured(context, "command");
+      if (!modelConfig) {
+        return;
+      }
 
       try {
         assertModelConfigured(modelConfig);

@@ -2,7 +2,7 @@ import * as vscode from "vscode";
 
 import { buildSelectionQuestionContext } from "@code-vibe/retrieval";
 import { answerGroundedQuestion } from "@code-vibe/model-gateway";
-import type { Thread, ThreadMessage, WorkspaceIndex } from "@code-vibe/shared";
+import type { ModelConfig, Thread, ThreadMessage, WorkspaceIndex } from "@code-vibe/shared";
 import { createId, nowIso } from "@code-vibe/shared";
 
 import type { PersistenceLayer } from "@code-vibe/persistence";
@@ -36,10 +36,22 @@ export class ThreadService {
     return this.threads.find((thread) => thread.id === threadId);
   }
 
+  async deleteThread(threadId: string): Promise<boolean> {
+    const nextThreads = this.threads.filter((thread) => thread.id !== threadId);
+    if (nextThreads.length === this.threads.length) {
+      return false;
+    }
+
+    this.threads = nextThreads;
+    await this.persistence.saveThreads(this.threads);
+    this.emitter.fire();
+    return true;
+  }
+
   async askQuestion(
     question: string,
     editorState: NonNullable<ReturnType<typeof import("../editor/selectionContext").getActiveSelectionState>>,
-    modelConfig: ReturnType<typeof import("../config/settings").getModelConfig>
+    modelConfig: ModelConfig
   ): Promise<Thread> {
     assertModelConfigured(modelConfig);
 

@@ -7,6 +7,8 @@ import { VibeCodeLensProvider } from "./editor/codeLensProvider";
 import { openCitation } from "./editor/sourceJump";
 import { registerAddThreadAnswerToCanvasCommand } from "./commands/addThreadAnswerToCanvas";
 import { registerAskAboutSelectionCommand } from "./commands/askAboutSelection";
+import { registerConfigureModelCommand } from "./commands/configureModel";
+import { registerDeleteThreadCommand } from "./commands/deleteThread";
 import { registerExplainCurrentSymbolCommand } from "./commands/explainCurrentSymbol";
 import { registerOpenCanvasCommand } from "./commands/openCanvas";
 import { registerOpenProjectOverviewCommand } from "./commands/openProjectOverview";
@@ -14,18 +16,17 @@ import { registerRefreshIndexCommand } from "./commands/refreshIndex";
 import { registerSaveSelectionAsCardCommand } from "./commands/saveSelectionAsCard";
 import { registerTestModelConnectionCommand } from "./commands/testModelConnection";
 import { registerTraceCallPathCommand } from "./commands/traceCallPath";
-import { evaluateThreadModelReadiness, getModelConfig } from "./config/settings";
+import { promptForInitialModelSetup } from "./config/settings";
 import { CardService } from "./services/cardService";
 import { CanvasService } from "./services/canvasService";
 import { IndexService } from "./services/indexService";
+import { ProjectOverviewService } from "./services/projectOverviewService";
 import { ThreadService } from "./services/threadService";
 import { VibeController } from "./services/vibeController";
 import { CardsViewProvider } from "./views/cardsView";
 import { MapViewProvider } from "./views/mapView";
 import { ThreadsViewProvider } from "./views/threadsView";
-
-const OPEN_VIBE_SETTINGS_ACTION = "Open Vibe Settings";
-let hasShownStartupModelReminder = false;
+import { prepareWorkspaceStorage } from "./workspaceStorage";
 
 export async function activate(context: vscode.ExtensionContext): Promise<void> {
   const output = vscode.window.createOutputChannel("Code Vibe Reading");
@@ -35,7 +36,20 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
   const workspaceFolder = vscode.workspace.workspaceFolders?.[0];
   if (!workspaceFolder) {
     // 注册基本的 views（显示空状态）
-    const emptyMapProvider = new MapViewProvider(null as any);
+    const emptyIndexService = {
+      onDidChange: () => new vscode.Disposable(() => {}),
+      getIndex: () => null,
+      getProjectSummary: () => null,
+      getRootPath: () => ""
+    } as any as IndexService;
+    const emptyProjectOverviewService = {
+      onDidChange: () => new vscode.Disposable(() => {}),
+      getOverview: () => null,
+      getStatus: () => "idle",
+      getLastError: () => ""
+    } as any as ProjectOverviewService;
+
+    const emptyMapProvider = new MapViewProvider(emptyIndexService, emptyProjectOverviewService);
     const emptyThreadsProvider = new ThreadsViewProvider(null as any);
     const emptyCardsProvider = new CardsViewProvider(null as any);
 
@@ -51,23 +65,41 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
     return;
   }
 
-  maybeShowStartupModelReminder();
+  await promptForInitialModelSetup(context);
 
-  const storageUri =
-    context.storageUri ?? vscode.Uri.joinPath(context.globalStorageUri, "workspace");
-  await ensureWorkspaceStorage(storageUri.fsPath);
-  const persistence = createWorkspacePersistence(storageUri.fsPath, "workspace");
+  const legacyStorageRoot = (
+    context.storageUri ?? vscode.Uri.joinPath(context.globalStorageUri, "workspace")
+  ).fsPath;
+  const workspaceStorage = await prepareWorkspaceStorage(
+    legacyStorageRoot,
+    workspaceFolder.uri.fsPath
+  );
+  await ensureWorkspaceStorage(workspaceStorage.storageRoot);
+  if (workspaceStorage.migrated) {
+    output.appendLine(`[storage] migrated legacy data into ${workspaceStorage.workspaceId}`);
+  }
+  const persistence = createWorkspacePersistence(
+    workspaceStorage.storageRoot,
+    workspaceStorage.workspaceId
+  );
 
   const indexService = new IndexService(workspaceFolder.uri.fsPath, persistence, output);
   const threadService = new ThreadService(persistence, indexService, output);
   const cardService = new CardService(persistence, indexService);
   const canvasService = new CanvasService(persistence, indexService, cardService);
+  const projectOverviewService = new ProjectOverviewService(
+    context,
+    indexService,
+    workspaceStorage.storageRoot,
+    output
+  );
 
   await Promise.all([
     indexService.initialize(),
     threadService.initialize(),
     cardService.initialize(),
-    canvasService.initialize()
+    canvasService.initialize(),
+    projectOverviewService.initialize()
   ]);
 
   const controller = new VibeController(
@@ -78,14 +110,18 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
     canvasService
   );
 
-  const mapViewProvider = new MapViewProvider(indexService);
+  const mapViewProvider = new MapViewProvider(indexService, projectOverviewService);
   const threadsViewProvider = new ThreadsViewProvider(threadService);
   const cardsViewProvider = new CardsViewProvider(cardService);
+  const threadsTreeView = vscode.window.createTreeView(VIEWS.threads, {
+    treeDataProvider: threadsViewProvider
+  });
+  threadsViewProvider.bindTreeView(threadsTreeView);
 
   context.subscriptions.push(
     controller,
     vscode.window.registerTreeDataProvider(VIEWS.map, mapViewProvider),
-    vscode.window.registerTreeDataProvider(VIEWS.threads, threadsViewProvider),
+    threadsTreeView,
     vscode.window.registerTreeDataProvider(VIEWS.cards, cardsViewProvider),
     vscode.languages.registerCodeLensProvider(
       [
@@ -114,56 +150,17 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
     })
   );
 
-  registerRefreshIndexCommand(context, indexService);
+  registerRefreshIndexCommand(context, indexService, projectOverviewService);
+  registerConfigureModelCommand(context);
   registerTestModelConnectionCommand(context, output);
   registerAskAboutSelectionCommand(context, indexService, threadService, controller);
+  registerDeleteThreadCommand(context, threadService, () => threadsViewProvider.getSelectedThread());
   registerExplainCurrentSymbolCommand(context, indexService, threadService, controller);
   registerSaveSelectionAsCardCommand(context, indexService, cardService, controller);
   registerAddThreadAnswerToCanvasCommand(context, threadService, cardService, canvasService, controller);
   registerOpenCanvasCommand(context, controller);
-  registerOpenProjectOverviewCommand(context, indexService);
+  registerOpenProjectOverviewCommand(context, indexService, projectOverviewService);
   registerTraceCallPathCommand(context, indexService, cardService, controller);
 }
 
 export function deactivate(): void {}
-
-function maybeShowStartupModelReminder(): void {
-  if (hasShownStartupModelReminder) {
-    return;
-  }
-
-  const readiness = evaluateThreadModelReadiness(getModelConfig());
-  if (readiness.isReady) {
-    return;
-  }
-
-  hasShownStartupModelReminder = true;
-  const message = buildThreadModelReminderMessage(readiness);
-
-  void vscode.window
-    .showWarningMessage(message, OPEN_VIBE_SETTINGS_ACTION)
-    .then(async (selection) => {
-      if (selection === OPEN_VIBE_SETTINGS_ACTION) {
-        await vscode.commands.executeCommand("workbench.action.openSettings", "vibe.model");
-      }
-    });
-}
-
-function buildThreadModelReminderMessage(
-  readiness: Exclude<ReturnType<typeof evaluateThreadModelReadiness>, { isReady: true }>
-): string {
-  if (readiness.reason === "mock-provider") {
-    return [
-      "Thread model configuration is incomplete.",
-      "vibe.model.provider is currently set to \"mock\".",
-      "Configure vibe.model settings to use a real model endpoint for grounded thread answers."
-    ].join(" ");
-  }
-
-  const missing = readiness.missingFields.map((field) => `vibe.model.${field}`).join(", ");
-  return [
-    "Thread model configuration is incomplete.",
-    `Missing required settings: ${missing}.`,
-    "Open Vibe Settings to finish setup."
-  ].join(" ");
-}

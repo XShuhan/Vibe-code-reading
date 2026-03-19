@@ -15,6 +15,7 @@ export function registerExplainCurrentSymbolCommand(
   context.subscriptions.push(
     vscode.commands.registerCommand("vibe.explainCurrentSymbol", async (_nodeId?: string) => {
       await askAboutSelection(
+        context,
         indexService,
         threadService,
         controller,
@@ -23,4 +24,3 @@ export function registerExplainCurrentSymbolCommand(
     })
   );
 }
-

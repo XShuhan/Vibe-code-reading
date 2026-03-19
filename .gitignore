@@ -5,4 +5,4 @@ coverage
 *.tsbuildinfo
 .vscode-test
 .turbo
-
+.code-vibe

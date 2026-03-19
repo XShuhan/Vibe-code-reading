@@ -1,10 +1,12 @@
 export const COMMANDS = {
   refreshIndex: "vibe.refreshIndex",
   testModelConnection: "vibe.testModelConnection",
+  configureModel: "vibe.configureModel",
   askAboutSelection: "vibe.askAboutSelection",
   explainCurrentSymbol: "vibe.explainCurrentSymbol",
   saveSelectionAsCard: "vibe.saveSelectionAsCard",
   addThreadAnswerToCanvas: "vibe.addThreadAnswerToCanvas",
+  deleteThread: "vibe.deleteThread",
   openCanvas: "vibe.openCanvas",
   traceCallPath: "vibe.traceCallPath",
   openThread: "vibe.openThread",

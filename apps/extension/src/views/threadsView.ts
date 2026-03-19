@@ -6,6 +6,7 @@ import type { ThreadService } from "../services/threadService";
 
 export class ThreadsViewProvider implements vscode.TreeDataProvider<Thread> {
   private readonly emitter = new vscode.EventEmitter<Thread | undefined>();
+  private selectedThread: Thread | undefined;
 
   readonly onDidChangeTreeData = this.emitter.event;
 
@@ -30,6 +31,16 @@ export class ThreadsViewProvider implements vscode.TreeDataProvider<Thread> {
 
   getChildren(): Thread[] {
     return this.threadService.getThreads();
+  }
+
+  bindTreeView(treeView: vscode.TreeView<Thread>): void {
+    treeView.onDidChangeSelection((event) => {
+      this.selectedThread = event.selection[0];
+    });
+  }
+
+  getSelectedThread(): Thread | undefined {
+    return this.selectedThread;
   }
 }
 
@@ -66,4 +77,3 @@ function resolveIcon(questionType: Thread["questionType"]): string {
       return "comment-discussion";
   }
 }
-
