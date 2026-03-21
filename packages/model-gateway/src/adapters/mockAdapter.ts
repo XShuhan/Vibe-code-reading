@@ -14,7 +14,11 @@ export class MockAdapter implements ModelAdapter {
 
   async *streamChat(request: ModelRequest): AsyncIterable<ModelChunk> {
     const response = await this.completeChat(request);
-    yield { delta: response.content, done: true };
+    const chunks = response.content.match(/.{1,120}/g) ?? [response.content];
+    for (const chunk of chunks) {
+      yield { delta: chunk };
+    }
+    yield { delta: "", done: true };
   }
 
   async completeChat(request: ModelRequest): Promise<ModelResponse> {

@@ -130,6 +130,8 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
         { scheme: "file", language: "typescriptreact" },
         { scheme: "file", language: "javascriptreact" },
         { scheme: "file", language: "python" },
+        { scheme: "file", language: "c" },
+        { scheme: "file", language: "cpp" },
         { scheme: "file", language: "shellscript" },
         { scheme: "file", language: "json" },
         { scheme: "file", language: "jsonc" }

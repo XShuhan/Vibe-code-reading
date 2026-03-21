@@ -17,6 +17,7 @@ export class VibeController implements vscode.Disposable {
   private canvasPanel: vscode.WebviewPanel | null = null;
   private readonly threadPanels = new Map<string, vscode.WebviewPanel>();
   private readonly cardPanels = new Map<string, vscode.WebviewPanel>();
+  private readonly initializedPanels = new WeakSet<vscode.WebviewPanel>();
   private readonly disposables: vscode.Disposable[] = [];
   private readonly webviewResourceRoots: readonly vscode.Uri[];
 
@@ -153,7 +154,16 @@ export class VibeController implements vscode.Disposable {
 
   private async updatePanel(panel: vscode.WebviewPanel, state: WebviewState): Promise<void> {
     panel.title = state.title;
-    panel.webview.html = createWebviewHtml(panel.webview, this.extensionUri, state);
+    if (!this.initializedPanels.has(panel)) {
+      panel.webview.html = createWebviewHtml(panel.webview, this.extensionUri, state);
+      this.initializedPanels.add(panel);
+      return;
+    }
+
+    await panel.webview.postMessage({
+      type: "bootstrap",
+      payload: state
+    });
   }
 
   private getWebviewOptions(): vscode.WebviewOptions & vscode.WebviewPanelOptions {

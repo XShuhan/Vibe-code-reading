@@ -87,6 +87,12 @@ function collectLanguageSet(paths: string[]): string[] {
     if (/\.py$/.test(filePath)) {
       languages.add("python");
     }
+    if (/\.(c|h)$/.test(filePath)) {
+      languages.add("c");
+    }
+    if (/\.(cc|cpp|cxx|hh|hpp|hxx)$/.test(filePath)) {
+      languages.add("cpp");
+    }
     if (/\.(sh|bash|zsh)$/.test(filePath)) {
       languages.add("shell");
     }

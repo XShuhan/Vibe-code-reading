@@ -24,6 +24,10 @@ export function analyzeTextFile(params: AnalyzeParams): FileAnalysisResult {
     return analyzePythonFile(params, lines, fileNode);
   }
 
+  if (/\.(c|h|cc|hh|cpp|hpp|cxx|hxx)$/.test(params.path)) {
+    return analyzeCppFile(params, lines, fileNode);
+  }
+
   if (/\.(sh|bash|zsh)$/.test(params.path)) {
     return analyzeShellFile(params, lines, fileNode);
   }
@@ -222,6 +226,108 @@ function analyzeShellFile(
   };
 }
 
+function analyzeCppFile(
+  params: AnalyzeParams,
+  lines: string[],
+  fileNode: CodeNode
+): FileAnalysisResult {
+  const nodes: CodeNode[] = [fileNode];
+  const containsEdges: CodeEdge[] = [];
+  const importSpecifiers: string[] = [];
+  const callReferences: CallReference[] = [];
+  const stack: Array<{ depth: number; node: CodeNode }> = [{ depth: 0, node: fileNode }];
+  let braceDepth = 0;
+
+  for (let index = 0; index < lines.length; index += 1) {
+    const rawLine = lines[index] ?? "";
+    const cleanedLine = removeCppComment(rawLine).trim();
+    if (!cleanedLine) {
+      braceDepth += countBraceDelta(rawLine);
+      continue;
+    }
+
+    const includeMatch = cleanedLine.match(/^#include\s+[<"]([^>"]+)[>"]/);
+    if (includeMatch?.[1]) {
+      importSpecifiers.push(includeMatch[1]);
+      braceDepth += countBraceDelta(rawLine);
+      continue;
+    }
+
+    while (stack.length > 1 && braceDepth < stack[stack.length - 1]!.depth) {
+      stack.pop();
+    }
+    const parent = stack[stack.length - 1]!.node;
+
+    const classMatch = cleanedLine.match(/^(?:template\s*<[^>]+>\s*)?(class|struct)\s+([A-Za-z_][A-Za-z0-9_]*)\b/);
+    if (classMatch?.[2]) {
+      const endLine = findBraceBlockEnd(lines, index);
+      const node = createNode(
+        params.workspaceId,
+        "class",
+        classMatch[2],
+        params.path,
+        index + 1,
+        endLine,
+        true,
+        parent.id,
+        cleanedLine
+      );
+      nodes.push(node);
+      containsEdges.push(createEdge(params.workspaceId, parent.id, node.id, "contains"));
+      const opensBlock = rawLine.includes("{");
+      if (opensBlock) {
+        stack.push({ depth: braceDepth + 1, node });
+      }
+      braceDepth += countBraceDelta(rawLine);
+      continue;
+    }
+
+    const functionName = extractCppFunctionName(cleanedLine);
+    if (functionName) {
+      const kind = parent.kind === "class" ? "method" : "function";
+      const endLine = findBraceBlockEnd(lines, index);
+      const node = createNode(
+        params.workspaceId,
+        kind,
+        functionName,
+        params.path,
+        index + 1,
+        endLine,
+        true,
+        parent.id,
+        cleanedLine
+      );
+      nodes.push(node);
+      containsEdges.push(createEdge(params.workspaceId, parent.id, node.id, "contains"));
+      const blockText = lines.slice(index, endLine).join("\n");
+      callReferences.push(
+        ...extractCppCallReferences({
+          callerNodeId: node.id,
+          filePath: params.path,
+          content: blockText,
+          containerName: parent.kind === "class" ? parent.name : undefined
+        })
+      );
+      const opensBlock = rawLine.includes("{");
+      if (opensBlock) {
+        stack.push({ depth: braceDepth + 1, node });
+      }
+      braceDepth += countBraceDelta(rawLine);
+      continue;
+    }
+
+    braceDepth += countBraceDelta(rawLine);
+  }
+
+  return {
+    fileNode,
+    nodes,
+    containsEdges,
+    importSpecifiers,
+    callReferences
+  };
+}
+
 function analyzeJsonFile(
   params: AnalyzeParams,
   lines: string[],
@@ -320,6 +426,33 @@ function extractShellCallReferences(params: {
   return [...references.values()];
 }
 
+function extractCppCallReferences(params: {
+  callerNodeId: string;
+  filePath: string;
+  content: string;
+  containerName?: string;
+}): CallReference[] {
+  const references = new Map<string, CallReference>();
+  const pattern = /\b(?:([A-Za-z_][A-Za-z0-9_]*)::)?([A-Za-z_][A-Za-z0-9_]*)\s*\(/g;
+
+  for (const match of params.content.matchAll(pattern)) {
+    const receiverText = match[1];
+    const name = match[2];
+    if (!name || ignoredCppCallNames.has(name)) {
+      continue;
+    }
+    references.set(`${receiverText ?? ""}:${name}`, {
+      callerNodeId: params.callerNodeId,
+      filePath: params.filePath,
+      name,
+      receiverText,
+      containerName: params.containerName
+    });
+  }
+
+  return [...references.values()];
+}
+
 function findPythonBlockEnd(lines: string[], startIndex: number, startIndent: number): number {
   let endLine = startIndex + 1;
   for (let index = startIndex + 1; index < lines.length; index += 1) {
@@ -355,6 +488,28 @@ function findShellBlockEnd(lines: string[], startIndex: number): number {
     }
   }
   return Math.max(startIndex + 1, lines.length);
+}
+
+function findBraceBlockEnd(lines: string[], startIndex: number): number {
+  let depth = 0;
+  let started = false;
+
+  for (let index = startIndex; index < lines.length; index += 1) {
+    const line = lines[index] ?? "";
+    for (const char of line) {
+      if (char === "{") {
+        depth += 1;
+        started = true;
+      } else if (char === "}") {
+        depth = Math.max(0, depth - 1);
+        if (started && depth === 0) {
+          return index + 1;
+        }
+      }
+    }
+  }
+
+  return startIndex + 1;
 }
 
 function findJsonKeyLine(lines: string[], key: string): number {
@@ -428,6 +583,54 @@ function normalizePythonImportSpecifier(value: string): string {
   return `./${value.replaceAll(".", "/")}`;
 }
 
+function removeCppComment(value: string): string {
+  return value.replace(/\/\/.*$/, "");
+}
+
+function countBraceDelta(value: string): number {
+  let delta = 0;
+  for (const char of value) {
+    if (char === "{") {
+      delta += 1;
+    } else if (char === "}") {
+      delta -= 1;
+    }
+  }
+  return delta;
+}
+
+function extractCppFunctionName(line: string): string | undefined {
+  if (!line.includes("(") || line.endsWith(";")) {
+    return undefined;
+  }
+
+  const controlKeyword = line.match(/^(if|for|while|switch|catch)\s*\(/);
+  if (controlKeyword) {
+    return undefined;
+  }
+
+  const beforeParen = line.split("(")[0]?.trim() ?? "";
+  if (!beforeParen) {
+    return undefined;
+  }
+
+  const token = beforeParen.split(/\s+/).at(-1);
+  if (!token) {
+    return undefined;
+  }
+
+  const normalized = token.includes("::") ? token.split("::").at(-1) : token;
+  if (!normalized || !/^[~A-Za-z_][A-Za-z0-9_]*$/.test(normalized)) {
+    return undefined;
+  }
+
+  if (cppNonFunctionTokens.has(normalized)) {
+    return undefined;
+  }
+
+  return normalized;
+}
+
 const ignoredCallNames = new Set([
   "if",
   "for",
@@ -460,3 +663,18 @@ const shellBuiltins = new Set([
   "return",
   "source"
 ]);
+
+const ignoredCppCallNames = new Set([
+  "if",
+  "for",
+  "while",
+  "switch",
+  "return",
+  "sizeof",
+  "static_cast",
+  "reinterpret_cast",
+  "const_cast",
+  "dynamic_cast"
+]);
+
+const cppNonFunctionTokens = new Set(["else", "do", "case", "default"]);

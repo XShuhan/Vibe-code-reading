@@ -11,7 +11,7 @@ const QUESTION_PATTERNS: Array<{ type: ThreadQuestionType; keywords: string[] }>
   },
   {
     type: "module_summary",
-    keywords: ["模块", "summary", "职责", "整体", "overview", "boundary", "边界"]
+    keywords: ["模块", "summary", "职责", "整体", "overview", "boundary", "边界", "总结", "归纳", "tl;dr", "tldr"]
   },
   {
     type: "principle",
@@ -34,4 +34,3 @@ export function classifyQuestionType(question: string): ThreadQuestionType {
 
   return "explain_code";
 }
-

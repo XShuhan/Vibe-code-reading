@@ -114,6 +114,7 @@ export interface ThreadMessage {
   citations: Citation[];
   createdAt: string;
   structuredAnswer?: StructuredThreadAnswer;
+  streamStatus?: ThreadStreamStatus;
 }
 
 export interface StructuredThreadAnswer {
@@ -127,6 +128,18 @@ export interface StructuredThreadAnswer {
   risks: string;
   uncertainty: string;
   sourceReferences: string[];
+  sections?: StructuredSection[];
+  extraSections?: StructuredSection[];
+}
+
+export interface StructuredSection {
+  title: string;
+  content: string;
+}
+
+export interface ThreadStreamStatus {
+  isStreaming: boolean;
+  currentSection?: string;
 }
 
 export interface Thread {

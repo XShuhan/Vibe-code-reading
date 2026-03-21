@@ -93,7 +93,7 @@ export async function askAboutSelection(
 ): Promise<Thread | undefined> {
   const editorState = getActiveSelectionState(indexService.getIndex());
   if (!editorState) {
-    vscode.window.showWarningMessage("Open a TS/JS file inside a workspace before asking Vibe.");
+    vscode.window.showWarningMessage("Open a source file inside a workspace before asking Vibe.");
     return undefined;
   }
 
@@ -132,7 +132,7 @@ function createSelectionComposer(
   const open = async (): Promise<void> => {
     const snapshot = captureSelectionSnapshot(indexService);
     if (!snapshot) {
-      vscode.window.showWarningMessage("Open a TS/JS file inside a workspace before asking Vibe.");
+      vscode.window.showWarningMessage("Open a source file inside a workspace before asking Vibe.");
       return;
     }
 
@@ -463,8 +463,11 @@ async function executeAskAboutSelection(
     return undefined;
   }
 
-  const thread = await threadService.askQuestion(question, editorState, modelConfig);
-  await controller.openThread(thread.id);
+  const thread = await threadService.askQuestion(question, editorState, modelConfig, {
+    onThreadCreated: async (createdThread) => {
+      await controller.openThread(createdThread.id);
+    }
+  });
   return thread;
 }
 

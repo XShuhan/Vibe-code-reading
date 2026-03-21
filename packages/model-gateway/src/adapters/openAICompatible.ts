@@ -38,8 +38,119 @@ export class OpenAICompatibleAdapter implements ModelAdapter {
   }
 
   async *streamChat(request: ModelRequest): AsyncIterable<ModelChunk> {
-    const response = await this.completeChat(request);
-    yield { delta: response.content, done: true };
+    assertConfigured(this.config);
+
+    const payload = {
+      model: request.model,
+      messages: request.messages.map((message) => ({
+        role: message.role,
+        content: message.content
+      })),
+      temperature: request.temperature,
+      max_tokens: request.maxTokens,
+      stream: true
+    };
+
+    let response: Response;
+    try {
+      response = await fetchWithRetry(
+        () =>
+          fetch(joinUrl(this.config.baseUrl, "/chat/completions"), {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              Authorization: `Bearer ${this.config.apiKey}`
+            },
+            body: JSON.stringify(payload)
+          }),
+        {
+          maxRetries: 3,
+          initialDelayMs: 700
+        }
+      );
+    } catch {
+      // Some providers fail on stream=true; gracefully downgrade to non-stream mode.
+      const fallback = await this.completeChat(request);
+      yield { delta: fallback.content, done: true };
+      return;
+    }
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      const detail = errorText.trim();
+      throw new Error(
+        `Model request failed: ${response.status} ${response.statusText}${detail ? ` - ${detail}` : ""}`
+      );
+    }
+
+    if (!response.body) {
+      const fallback = await this.completeChat(request);
+      yield { delta: fallback.content, done: true };
+      return;
+    }
+
+    const reader = response.body.getReader();
+    const decoder = new TextDecoder();
+    let buffer = "";
+
+    while (true) {
+      const { value, done } = await reader.read();
+      if (done) {
+        break;
+      }
+
+      buffer += decoder.decode(value, { stream: true });
+      const lines = buffer.split(/\r?\n/);
+      buffer = lines.pop() ?? "";
+
+      for (const rawLine of lines) {
+        const line = rawLine.trim();
+        if (!line || !line.startsWith("data:")) {
+          continue;
+        }
+
+        const data = line.slice("data:".length).trim();
+        if (!data || data === "[DONE]") {
+          continue;
+        }
+
+        try {
+          const payloadChunk = JSON.parse(data) as {
+            choices?: Array<{
+              delta?: { content?: string };
+            }>;
+          };
+          const delta = payloadChunk.choices?.[0]?.delta?.content;
+          if (delta) {
+            yield { delta };
+          }
+        } catch {
+          // Ignore malformed event chunks and continue streaming.
+        }
+      }
+    }
+
+    const tail = buffer.trim();
+    if (tail.startsWith("data:")) {
+      const data = tail.slice("data:".length).trim();
+      if (data && data !== "[DONE]") {
+        try {
+          const payloadChunk = JSON.parse(data) as {
+            choices?: Array<{
+              delta?: { content?: string };
+            }>;
+          };
+          const delta = payloadChunk.choices?.[0]?.delta?.content;
+          if (delta) {
+            yield { delta };
+          }
+        } catch {
+          // Ignore malformed tail chunk.
+        }
+      }
+    }
+
+    yield { delta: "", done: true };
   }
 
   async completeChat(request: ModelRequest): Promise<ModelResponse> {
@@ -55,14 +166,26 @@ export class OpenAICompatibleAdapter implements ModelAdapter {
       max_tokens: request.maxTokens
     };
 
-    const response = await fetch(joinUrl(this.config.baseUrl, "/chat/completions"), {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${this.config.apiKey}`
-      },
-      body: JSON.stringify(payload)
-    });
+    let response: Response;
+    try {
+      response = await fetchWithRetry(
+        () =>
+          fetch(joinUrl(this.config.baseUrl, "/chat/completions"), {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              Authorization: `Bearer ${this.config.apiKey}`
+            },
+            body: JSON.stringify(payload)
+          }),
+        {
+          maxRetries: 3,
+          initialDelayMs: 700
+        }
+      );
+    } catch (error) {
+      throw toNetworkError(this.config.baseUrl, error);
+    }
 
     if (!response.ok) {
       const errorText = await response.text();
@@ -104,4 +227,63 @@ function assertConfigured(config: ModelConfig): void {
   if (!config.baseUrl || !config.apiKey || !config.model) {
     throw new Error("Missing vibe model configuration. Configure provider, baseUrl, apiKey, and model.");
   }
+}
+
+interface RetryOptions {
+  maxRetries: number;
+  initialDelayMs: number;
+}
+
+async function fetchWithRetry(
+  execute: () => Promise<Response>,
+  options: RetryOptions
+): Promise<Response> {
+  let attempt = 0;
+
+  while (true) {
+    const response = await execute();
+    if (!shouldRetry(response.status) || attempt >= options.maxRetries) {
+      return response;
+    }
+
+    const delayMs = readRetryAfter(response) ?? options.initialDelayMs * 2 ** attempt;
+    await sleep(delayMs);
+    attempt += 1;
+  }
+}
+
+function shouldRetry(status: number): boolean {
+  return status === 429 || status === 503;
+}
+
+function readRetryAfter(response: Response): number | undefined {
+  const value = response.headers.get("retry-after");
+  if (!value) {
+    return undefined;
+  }
+
+  const asSeconds = Number(value);
+  if (Number.isFinite(asSeconds)) {
+    return Math.max(0, Math.round(asSeconds * 1000));
+  }
+
+  const dateMs = Date.parse(value);
+  if (Number.isNaN(dateMs)) {
+    return undefined;
+  }
+
+  return Math.max(0, dateMs - Date.now());
+}
+
+function sleep(durationMs: number): Promise<void> {
+  return new Promise((resolve) => {
+    setTimeout(resolve, durationMs);
+  });
+}
+
+function toNetworkError(baseUrl: string, error: unknown): Error {
+  const reason = error instanceof Error ? error.message : String(error);
+  return new Error(
+    `Model network request failed for ${baseUrl}. Check baseUrl, API key, VPN/proxy, and provider status. Original error: ${reason}`
+  );
 }
