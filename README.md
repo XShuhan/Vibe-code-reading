@@ -19,6 +19,75 @@ Demo workflows:
 
 - [docs/DEMO.md](./docs/DEMO.md)
 
+## Quick Start
+
+### 1. Startup Preparation
+
+You can use one command to run the repository startup flow: install dependencies, build the project, and launch the Extension Development Host.
+
+From the repository root, run this in Bash. On Windows, use Git Bash:
+
+```bash
+bash ./start.sh
+```
+
+If the script already has execute permission in your environment, `./start.sh` works as well.
+
+The script is designed for a repeatable local development startup flow and is compatible with Bash environments including Windows Git Bash.
+
+After the command finishes, VS Code opens this repository and launches an Extension Development Host window for the extension in `apps/extension`.
+
+If you are new to the project, use this flow:
+
+1. Install Node.js, `pnpm`, and VS Code on your machine.
+2. Make sure the VS Code CLI command `code` is available in your terminal.
+3. Open Git Bash.
+4. Change into the repository root directory.
+5. Run `bash ./start.sh`.
+6. Wait for dependency installation and build to finish.
+7. Confirm that VS Code opens and a new Extension Development Host window appears.
+
+If `pnpm` is missing, the script stops immediately and tells you to install it first. If the build fails, the script exits with a non-zero status and does not continue to open VS Code.
+
+### 2. Configure A Model
+
+Run:
+
+```text
+Vibe: Configure API
+```
+
+Required fields:
+
+- `baseUrl`
+- `apiKey`
+- `model`
+
+The current implementation expects an OpenAI-compatible chat completion API.
+
+For `Project Overview`, `glm`-series APIs are currently not recommended. In our testing, their generated overview structure and content quality were noticeably worse than alternatives such as `qwen3.5-plus`, which often leads to weaker or less stable overview results.
+
+### 3. Index And Read
+
+Run:
+
+```text
+Vibe: Refresh Index
+```
+
+That command:
+
+1. rebuilds the workspace index
+2. regenerates the AI project overview
+
+After that you can:
+
+- open the `Map` view
+- open `Project Overview`
+- ask about a selection
+- trace call paths
+- save cards and use the canvas
+
 ## What It Does
 
 - Builds a workspace map of files, symbols, imports, callers, and callees
@@ -74,61 +143,6 @@ The overview is grounded in:
 - Add thread answers to the canvas
 - Connect cards with typed relationships
 
-## Quick Start
-
-### 1. Install Dependencies
-
-```bash
-pnpm install
-```
-
-### 2. Build
-
-```bash
-pnpm build
-```
-
-### 3. Run The Extension
-
-Open the repository in VS Code and launch an Extension Development Host.
-
-### 4. Configure A Model
-
-Run:
-
-```text
-Vibe: Configure API
-```
-
-Required fields:
-
-- `baseUrl`
-- `apiKey`
-- `model`
-
-The current implementation expects an OpenAI-compatible chat completion API.
-
-### 5. Index And Read
-
-Run:
-
-```text
-Vibe: Refresh Index
-```
-
-That command:
-
-1. rebuilds the workspace index
-2. regenerates the AI project overview
-
-After that you can:
-
-- open the `Map` view
-- open `Project Overview`
-- ask about a selection
-- trace call paths
-- save cards and use the canvas
-
 ## Commands
 
 | Command | Purpose |
@@ -167,16 +181,6 @@ Typical files include:
 - `project-overview.json`
 
 These files are local workspace artifacts and should stay out of version control.
-
-## Development
-
-```bash
-pnpm typecheck
-pnpm test
-pnpm build
-pnpm dev:extension
-pnpm dev:webview
-```
 
 ## Repository Layout
 

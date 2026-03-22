@@ -156,15 +156,7 @@ export class OpenAICompatibleAdapter implements ModelAdapter {
   async completeChat(request: ModelRequest): Promise<ModelResponse> {
     assertConfigured(this.config);
 
-    const payload = {
-      model: request.model,
-      messages: request.messages.map((message) => ({
-        role: message.role,
-        content: message.content
-      })),
-      temperature: request.temperature,
-      max_tokens: request.maxTokens
-    };
+    const payload = buildCompletionPayload(request);
 
     let response: Response;
     try {
@@ -185,6 +177,28 @@ export class OpenAICompatibleAdapter implements ModelAdapter {
       );
     } catch (error) {
       throw toNetworkError(this.config.baseUrl, error);
+    }
+
+    if (!response.ok && request.responseFormat) {
+      const fallbackPayload = buildCompletionPayload({
+        ...request,
+        responseFormat: undefined
+      });
+      response = await fetchWithRetry(
+        () =>
+          fetch(joinUrl(this.config.baseUrl, "/chat/completions"), {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              Authorization: `Bearer ${this.config.apiKey}`
+            },
+            body: JSON.stringify(fallbackPayload)
+          }),
+        {
+          maxRetries: 3,
+          initialDelayMs: 700
+        }
+      );
     }
 
     if (!response.ok) {
@@ -221,6 +235,35 @@ export class OpenAICompatibleAdapter implements ModelAdapter {
 
 function joinUrl(baseUrl: string, suffix: string): string {
   return `${baseUrl.replace(/\/+$/, "")}${suffix}`;
+}
+
+function buildCompletionPayload(request: ModelRequest): Record<string, unknown> {
+  const payload: Record<string, unknown> = {
+    model: request.model,
+    messages: request.messages.map((message) => ({
+      role: message.role,
+      content: message.content
+    })),
+    temperature: request.temperature,
+    max_tokens: request.maxTokens
+  };
+
+  if (request.responseFormat?.type === "json_object") {
+    payload.response_format = {
+      type: "json_object"
+    };
+  } else if (request.responseFormat?.type === "json_schema") {
+    payload.response_format = {
+      type: "json_schema",
+      json_schema: {
+        name: request.responseFormat.json_schema.name,
+        strict: request.responseFormat.json_schema.strict ?? true,
+        schema: request.responseFormat.json_schema.schema
+      }
+    };
+  }
+
+  return payload;
 }
 
 function assertConfigured(config: ModelConfig): void {

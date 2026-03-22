@@ -2,6 +2,7 @@ import fs from "node:fs/promises";
 import path from "node:path";
 
 const DEFAULT_IGNORES = new Set([
+  ".code-vibe",
   ".git",
   "node_modules",
   "dist",

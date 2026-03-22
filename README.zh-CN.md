@@ -19,6 +19,73 @@ Code Vibe Reading 目前围绕四个核心阅读界面组织：
 
 - [docs/DEMO.md](./docs/DEMO.md)
 
+
+## 快速开始
+
+### 1. 启动准备
+
+你可以用一条命令串起仓库内的启动步骤：安装依赖、构建项目，并启动 Extension Development Host。
+
+请在仓库根目录下使用 Bash 执行。Windows 环境建议使用 Git Bash：
+
+```bash
+bash ./start.sh
+```
+
+如果当前环境已经给脚本加了可执行权限，也可以直接运行 `./start.sh`。
+
+该脚本适用于可重复执行的本地开发启动流程，兼容 Windows Git Bash 等 Bash 环境。
+
+命令执行完成后，VS Code 会打开当前仓库，并自动拉起一个用于调试 `apps/extension` 的 Extension Development Host 窗口。
+
+如果你是第一次上手，建议按下面的步骤操作：
+
+1. 先在本机安装 Node.js、`pnpm` 和 VS Code。
+2. 确认终端里可以直接使用 VS Code CLI 命令 `code`。
+3. 打开 Git Bash。
+4. 切换到仓库根目录。
+5. 运行 `bash ./start.sh`。
+6. 等待依赖安装和构建完成。
+7. 确认 VS Code 已打开，并出现新的 Extension Development Host 窗口。
+
+如果缺少 `pnpm`，脚本会立即停止并提示先安装；如果构建失败，脚本会以非零退出码结束，不会继续打开 VS Code。
+
+### 2. 配置模型
+
+执行：
+
+```text
+Vibe: Configure API
+```
+
+必填项：
+
+- `baseUrl`
+- `apiKey`
+- `model`
+
+当前实现默认接入 OpenAI 兼容的聊天补全接口。
+
+### 3. 建索引并开始阅读
+
+执行：
+
+```text
+Vibe: Refresh Index
+```
+
+这个命令会：
+
+1. 重建工作区索引
+2. 重新生成 AI 项目概览
+
+之后你就可以：
+
+- 打开 `Map` 视图
+- 打开 `Project Overview`
+- 对选区提问
+- 跟踪调用路径
+- 保存卡片并使用画布
 ## 它能做什么
 
 - 构建工作区代码地图，展示文件、符号、导入关系、调用者和被调用者
@@ -74,61 +141,6 @@ Code Vibe Reading 目前围绕四个核心阅读界面组织：
 - 把线程回答加入画布
 - 用带类型的边连接卡片
 
-## 快速开始
-
-### 1. 安装依赖
-
-```bash
-pnpm install
-```
-
-### 2. 构建
-
-```bash
-pnpm build
-```
-
-### 3. 运行扩展
-
-用 VS Code 打开仓库，并启动 Extension Development Host。
-
-### 4. 配置模型
-
-执行：
-
-```text
-Vibe: Configure API
-```
-
-必填项：
-
-- `baseUrl`
-- `apiKey`
-- `model`
-
-当前实现默认接入 OpenAI 兼容的聊天补全接口。
-
-### 5. 建索引并开始阅读
-
-执行：
-
-```text
-Vibe: Refresh Index
-```
-
-这个命令会：
-
-1. 重建工作区索引
-2. 重新生成 AI 项目概览
-
-之后你就可以：
-
-- 打开 `Map` 视图
-- 打开 `Project Overview`
-- 对选区提问
-- 跟踪调用路径
-- 保存卡片并使用画布
-
 ## 命令
 
 | 命令 | 作用 |
@@ -168,15 +180,6 @@ Vibe: Refresh Index
 
 这些文件属于本地工作区产物，不应进入版本控制。
 
-## 开发命令
-
-```bash
-pnpm typecheck
-pnpm test
-pnpm build
-pnpm dev:extension
-pnpm dev:webview
-```
 
 ## 仓库结构
 
@@ -198,3 +201,5 @@ packages/
 - 最丰富的结构分析仍然在 TS/JS 路径上
 - 项目概览使用的是“抽样源码摘录”，不是把整个仓库全文直接塞给模型
 - 当前更偏本地开发使用，还没有面向 Marketplace 发布
+ 
+> 提示：对于 Project Overview，当前不建议使用 glm 系列 API。根据现有测试结果，它生成的概览结构稳定性和内容质量都明显弱于 qwen3.5-plus 等替代模型，容易导致概览结果偏弱或不稳定。

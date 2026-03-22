@@ -253,11 +253,25 @@ export interface ChatMessage {
   content: string;
 }
 
+export type ModelResponseFormat =
+  | {
+      type: "json_object";
+    }
+  | {
+      type: "json_schema";
+      json_schema: {
+        name: string;
+        schema: Record<string, unknown>;
+        strict?: boolean;
+      };
+    };
+
 export interface ModelRequest {
   model: string;
   messages: ChatMessage[];
   temperature?: number;
   maxTokens?: number;
+  responseFormat?: ModelResponseFormat;
 }
 
 export interface ModelChunk {
